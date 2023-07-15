@@ -1,4 +1,4 @@
-bin_PROGRAMS=burrTxt burrTxt2 gui/burrGui
+bin_PROGRAMS=burrTxt burrTxt2 gui/burrGui tmp
 noinst_LIBRARIES=lib/libburr.a flu/libflu.a help/libhelp.a lua/liblua.a tools/libtools.a halfedge/libhalfedge.a
 noinst_PROGRAMS=help/helpviewer unitTest
 
@@ -318,3 +318,5 @@ gui_burrGui_SOURCES += gui/images/Rescale_Monochrome_X1.xpm gui/images/Rescale_M
 gui_burrGui_SOURCES += gui/images/ViewMode3D.xpm gui/images/ViewMode3DL.xpm gui/images/ViewModeColor.xpm gui/images/ViewModeNormal.xpm
 gui_burrGui_SOURCES += gui/images/ViewModeInsides.xpm
 
+tmp_LDADD = cadical/build/libcadical.a lib/libburr.a lua/liblua.a tools/libtools.a halfedge/libhalfedge.a $(LDADD)
+tmp_SOURCES=tmp.cpp

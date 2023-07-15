@@ -8,6 +8,7 @@
 **/*.a
 **/*.xmpuzzlettt
 admin/
+gendoc/
 configure
 autom4te.cache
 config.log
@@ -21,6 +22,7 @@ src/help/helpdata.cpp
 src/burrTxt
 src/burrTxt2
 src/gui/burrGui
+src/tmp
 src/help/helpviewer
 src/unitTest
 src/config.h.in
