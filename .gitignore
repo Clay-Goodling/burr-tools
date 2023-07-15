@@ -6,12 +6,14 @@
 **/aclocal.m4
 **/*.o
 **/*.a
+**/*.xmpuzzlettt
 admin/
 configure
 autom4te.cache
 config.log
 config.status
 doxygen.cfg
+INSTALL
 src/config.h
 src/config.h.in
 src/stamp-h1
