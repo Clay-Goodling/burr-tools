@@ -22,6 +22,7 @@
 
 #include "assembler_0.h"
 #include "assembler_1.h"
+#include "assembler_2.h"
 #include "movementcache_0.h"
 #include "movementcache_1.h"
 #include "voxel_0.h"
@@ -234,13 +235,17 @@ unsigned int gridType_c::getCapabilities(void) const
 
 assembler_c * gridType_c::findAssembler(const problem_c & p)
 {
-  if (assembler_0_c::canHandle(p)) {
+  if (0 && assembler_0_c::canHandle(p)) {
     fprintf(stderr, "using assembler 0\n");
     return new assembler_0_c(p);
   }
-  if (assembler_1_c::canHandle(p)) {
+  if (0 && assembler_1_c::canHandle(p)) {
     fprintf(stderr, "using assembler 1\n");
     return new assembler_1_c(p);
+  }
+  if (assembler_2_c::canHandle(p)) {
+    fprintf(stderr, "using assembler 2\n");
+    return new assembler_2_c(p);
   }
 
   return 0;

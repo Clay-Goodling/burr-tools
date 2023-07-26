@@ -1,4 +1,4 @@
-bin_PROGRAMS=burrTxt burrTxt2 gui/burrGui tmp
+bin_PROGRAMS=burrTxt burrTxt2 gui/burrGui
 noinst_LIBRARIES=lib/libburr.a flu/libflu.a help/libhelp.a lua/liblua.a tools/libtools.a halfedge/libhalfedge.a
 noinst_PROGRAMS=help/helpviewer unitTest
 
@@ -68,10 +68,10 @@ help_helpviewer_SOURCES += help/Fl_Help_Dialog.cpp help/Fl_Help_Dialog.h
 help_helpviewer_SOURCES += help/Fl_Help_View.cpp help/Fl_Help_View.h
 help_helpviewer_SOURCES += help/flstring.cpp help/flstring.h
 
-burrTxt_LDADD = lib/libburr.a lua/liblua.a tools/libtools.a halfedge/libhalfedge.a $(LDADD)
+burrTxt_LDADD = lib/libburr.a lua/liblua.a tools/libtools.a halfedge/libhalfedge.a cadical/build/libcadical.a $(LDADD)
 burrTxt_SOURCES=burrTxt.cpp
 
-burrTxt2_LDADD = lib/libburr.a lua/liblua.a tools/libtools.a halfedge/libhalfedge.a $(LDADD)
+burrTxt2_LDADD = lib/libburr.a lua/liblua.a tools/libtools.a halfedge/libhalfedge.a cadical/build/libcadical.a $(LDADD)
 burrTxt2_SOURCES=burrTxt2.cpp
 
 lib_libburr_a_CPPFLAGS = $(AM_CPPFLAGS) -Werror
@@ -79,6 +79,7 @@ lib_libburr_a_SOURCES =
 lib_libburr_a_SOURCES += lib/assembler.cpp lib/assembler.h
 lib_libburr_a_SOURCES += lib/assembler_0.cpp lib/assembler_0.h
 lib_libburr_a_SOURCES += lib/assembler_1.cpp lib/assembler_1.h
+lib_libburr_a_SOURCES += lib/assembler_2.cpp lib/assembler_2.h
 lib_libburr_a_SOURCES += lib/assembly.cpp lib/assembly.h
 lib_libburr_a_SOURCES += lib/bitfield.h
 lib_libburr_a_SOURCES += lib/bt_assert.cpp lib/bt_assert.h
@@ -151,7 +152,7 @@ lib_libburr_a_SOURCES += lib/tabs_3/meshverts.inc
 lib_libburr_a_SOURCES += lib/tabs_4/meshverts.inc
 
 # the library tester program
-unitTest_LDADD = lib/libburr.a lua/liblua.a tools/libtools.a halfedge/libhalfedge.a $(LDADD)
+unitTest_LDADD = lib/libburr.a lua/liblua.a tools/libtools.a halfedge/libhalfedge.a cadical/build/libcadical.a $(LDADD)
 unitTest_SOURCES =
 unitTest_SOURCES += lib/main_test.cpp
 unitTest_SOURCES += lib/bitfield_test.cpp
@@ -212,7 +213,7 @@ flu_libflu_a_SOURCES=\
     flu/Flu_Wrap_Group.h
 
 gui_burrGui_CPPFLAGS = $(AM_CPPFLAGS)
-gui_burrGui_LDADD = lib/libburr.a help/libhelp.a flu/libflu.a lua/liblua.a tools/libtools.a halfedge/libhalfedge.a $(LDADD)
+gui_burrGui_LDADD = lib/libburr.a help/libhelp.a flu/libflu.a lua/liblua.a tools/libtools.a halfedge/libhalfedge.a cadical/build/libcadical.a $(LDADD)
 gui_burrGui_SOURCES =
 gui_burrGui_SOURCES += gui/arcball.cpp gui/arcball.h
 gui_burrGui_SOURCES += gui/assertwindow.cpp gui/assertwindow.h
@@ -317,6 +318,3 @@ gui_burrGui_SOURCES += gui/images/Rescale_Disabled_X1.xpm gui/images/Rescale_Dis
 gui_burrGui_SOURCES += gui/images/Rescale_Monochrome_X1.xpm gui/images/Rescale_Monochrome_X2.xpm gui/images/Rescale_Monochrome_X3.xpm
 gui_burrGui_SOURCES += gui/images/ViewMode3D.xpm gui/images/ViewMode3DL.xpm gui/images/ViewModeColor.xpm gui/images/ViewModeNormal.xpm
 gui_burrGui_SOURCES += gui/images/ViewModeInsides.xpm
-
-tmp_LDADD = cadical/build/libcadical.a lib/libburr.a lua/liblua.a tools/libtools.a halfedge/libhalfedge.a $(LDADD)
-tmp_SOURCES=tmp.cpp
