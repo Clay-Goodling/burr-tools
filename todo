@@ -1,0 +1,10 @@
+reduce
+	cadical preprocessing
+	
+assemble
+	cadical solve
+
+getAssembly
+	find placement from solved cadical formula
+
+save, load
