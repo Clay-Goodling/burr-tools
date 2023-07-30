@@ -98,6 +98,36 @@ bool assembler_2_c::canPlace(const voxel_c * piece, int x, int y, int z) const {
   return true;
 }
 
+int assembler_2_c::atMostOne(std::vector<unsigned int> lits, int i0, int i1) {
+
+  bt_assert(i0 <= i1);
+
+  int k = i1 - i0;
+  if (k <= 4) {
+    for (int i = i0; i < i1; i++)
+      for (int j = i+1; j < i1; j++) {
+        solver->add(-lits[i]);
+        solver->add(-lits[j]);
+        solver->add(0);
+      }
+    return (k * (k - 1)) >> 1;
+  }
+
+  int m = ++lit;
+  for (int i = i0; i < i0 + (k >> 1); i++) {
+    solver->add(-lits[i]);
+    solver->add(-m);
+    solver->add(0);
+  }
+
+  for (int i = i0 + (k >> 1); i < i1; i++) {
+    solver->add(-lits[i]);
+    solver->add(m);
+    solver->add(0);
+  }
+
+  return k + atMostOne(lits, i0, i0 + (k >> 1)) + atMostOne(lits, i0 + (k >> 1), i1);
+}
 
 /**
  * this function prepares the matrix of nodes for the recursive function
@@ -303,7 +333,7 @@ int assembler_2_c::prepare(void) {
           for (int y = (int)result->boundY1()-(int)rotation->boundY1(); y <= (int)result->boundY2()-(int)rotation->boundY2(); y++)
             for (int z = (int)result->boundZ1()-(int)rotation->boundZ1(); z <= (int)result->boundZ2()-(int)rotation->boundZ2(); z++)
               if (canPlace(rotation, x, y, z)) {
-                literalPositions.push_back(assembler_2_c::piecePosition(x, y, z, rot, pc));
+                literalPositions.push_back(assembler_2_c::piecePosition(x+rotation->getHx(), y+rotation->getHy(), z+rotation->getHz(), rot, pc));
                 lit++;
                 piecePlacements[pc].push_back(lit);
                 placements = 1;
@@ -343,6 +373,7 @@ int assembler_2_c::prepare(void) {
     }
   }
 
+  int ppc = 0;
   /* ensure each piece is placed and not placed more than once */
   for (unsigned int pc = 0; pc < problem.getNumberOfParts(); pc++) {
 
@@ -352,14 +383,11 @@ int assembler_2_c::prepare(void) {
     solver->add(0);
 
     /* no more than one placement */
-    for (unsigned int i = 0; i < piecePlacements[pc].size(); i++)
-      for (unsigned int j = i+1; j < piecePlacements[pc].size(); j++) {
-        solver->add(-piecePlacements[pc][i]);
-        solver->add(-piecePlacements[pc][j]);
-        solver->add(0);
-      }
+    ppc += atMostOne(piecePlacements[pc], 0, piecePlacements[pc].size());
   }
+  fprintf(stderr, "piece placement clauses: %d\n", ppc);
 
+  int vuc = 0;
   /* ensure each voxel in the result is filled if required and not double filled*/
   for (unsigned int vox = 0; vox < result->getXYZ(); vox++) {
 
@@ -370,14 +398,10 @@ int assembler_2_c::prepare(void) {
       solver->add(0);
     }
 
-    /* no more than one placement */
-    for (unsigned int i = 0; i < voxelPlacements[vox].size(); i++)
-      for (unsigned int j = i+1; j < voxelPlacements[vox].size(); j++) {
-        solver->add(-voxelPlacements[vox][i]);
-        solver->add(-voxelPlacements[vox][j]);
-        solver->add(0);
-      }
+    // /* no more than one placement */
+    vuc += atMostOne(voxelPlacements[vox], 0, voxelPlacements[vox].size());
   }
+  fprintf(stderr, "voxel usage clauses: %d\n", vuc);
 
   delete [] cache;
 
@@ -497,12 +521,8 @@ assembly_c * assembler_2_c::getAssembly(void) {
   solver->add(0);
 
   for (unsigned int i = 0; i < piecenumber; i++)
-    if (pieces[i] < 0)
-      assembly->addNonPlacement();
-    else {
-      fprintf(stderr, "piece: %d, trans: %d, xyz: (%d, %d, %d)\n", i, trans[i], xs[i], ys[i], zs[i]);
-      assembly->addPlacement(trans[i], xs[i], ys[i], zs[i]);
-    }
+    if (pieces[i] < 0) assembly->addNonPlacement();
+    else assembly->addPlacement(trans[i], xs[i], ys[i], zs[i]);
 
   delete [] pieces;
   delete [] trans;

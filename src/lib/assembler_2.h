@@ -89,6 +89,13 @@ private:
    */
   bool canPlace(const voxel_c * piece, int x, int y, int z) const;
 
+  /* this function adds clauses to the solver to ensure that at most
+   * one of the literals in lit[i0:i1) is true
+   *
+   * returns the number of clauses used
+   */
+  int atMostOne(std::vector<unsigned int> lits, int i0, int i1);
+
   /* this function creates the matrix for the search function
    * because we need to know how many nodes we need to allocate the
    * arrays with the right size, we add a parameter. If this is true
