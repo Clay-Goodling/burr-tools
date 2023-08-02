@@ -96,6 +96,8 @@ private:
    */
   int atMostOne(std::vector<unsigned int> lits, int i0, int i1);
 
+  int cardinalityConstraint(std::vector<unsigned int>, unsigned int min, unsigned int max);
+
   /* this function creates the matrix for the search function
    * because we need to know how many nodes we need to allocate the
    * arrays with the right size, we add a parameter. If this is true
@@ -104,7 +106,7 @@ private:
    *
    * return error codes
    */
-  int prepare(void);
+  int prepare();
 
   /* internal error state */
   errState errorsState;

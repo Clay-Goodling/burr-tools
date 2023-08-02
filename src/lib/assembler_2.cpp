@@ -188,6 +188,8 @@ int assembler_2_c::prepare(void) {
      * as its a difference if we select a piece that has only one placement anyway
      * or select one with 400 placements of which 23/24th can be dropped
      */
+    unsigned int symBreakerPiece = 0;
+    unsigned int pc = problem.getPartMaximum(0);
     unsigned int bestFound = sym->countSymmetryIntersection(resultSym, problem.getPartShape(0)->selfSymmetries());
     symBreakerShape = 0;
 
@@ -195,14 +197,37 @@ int assembler_2_c::prepare(void) {
 
       unsigned int cnt = sym->countSymmetryIntersection(resultSym, problem.getPartShape(i)->selfSymmetries());
 
-      if (cnt < bestFound) {
+      if ((problem.getPartMaximum(i) < problem.getPartMaximum(symBreakerShape)) ||
+          ((problem.getPartMaximum(i) == problem.getPartMaximum(symBreakerShape)) && (cnt < bestFound))) {
         bestFound = cnt;
         symBreakerShape = i;
+        symBreakerPiece = pc;
       }
+
+      pc += problem.getPartMaximum(i);
     }
 
-    if (sym->symmetriesLeft(resultSym, problem.getPartShape(symBreakerShape)->selfSymmetries()))
-      checkForTransformedAssemblies(symBreakerShape, 0);
+    bool tmp = sym->symmetriesLeft(resultSym, problem.getPartShape(symBreakerShape)->selfSymmetries());
+
+    bool pieceRanges = false;
+    for (unsigned int i = 0; i < problem.getNumberOfParts(); i++)
+      if (problem.getPartMinimum(i) != problem.getPartMaximum(i)) {
+        pieceRanges = true;
+        break;
+      }
+
+    if (tmp || (problem.getPartMaximum(symBreakerShape) > 1) || pieceRanges) {
+
+      // we can not use the symmetry breaker shape, if there is more than one piece
+      // of this shape in the problem
+      if (pieceRanges || problem.getPartMaximum(symBreakerShape) > 1) {
+        symBreakerShape = 0xFFFFFFFF;
+        symBreakerPiece = 0xFFFFFFFF;
+      }
+
+      checkForTransformedAssemblies(symBreakerPiece, 0);
+    }
+
 
     if (sym->symmetryContainsMirror(resultSym)) {
       /* we need to to the mirror check here, and initialise the mirror
@@ -224,12 +249,15 @@ int assembler_2_c::prepare(void) {
 
       mm * mirror = new mm[piecenumber];
 
+      pc = 0;
       // first initialize
-      for (unsigned int i = 0; i < problem.getNumberOfParts(); i++) {
-        mirror[i].shape = i;
-        mirror[i].mirror = (unsigned int)-1;
-        mirror[i].trans = 255;
-      }
+      for (unsigned int i = 0; i < problem.getNumberOfParts(); i++)
+        for (unsigned int p = 0; p < problem.getPartMaximum(i); p++) {
+          mirror[pc].shape = i;
+          mirror[pc].mirror = (unsigned int)-1;
+          mirror[pc].trans = 255;
+          pc++;
+        }
 
       bool mirrorCheck = true;
 
@@ -278,9 +306,11 @@ int assembler_2_c::prepare(void) {
         }
       }
 
-      if (mirrorCheck) {
+      if (mirrorCheck || pieceRanges) {
         /* all the shapes are either self mirroring or have a mirror pair
          * so we create the mirror structure and we do the mirror check
+         * we also need to that when ranges are used because the final solution
+         * might use only mirrorable pieces and then we need this information
          */
         mirrorInfo_c * mir = new mirrorInfo_c();
 
@@ -301,7 +331,7 @@ int assembler_2_c::prepare(void) {
   literalPositions.assign(1, assembler_2_c::piecePosition(0,0,0,0,0));
   lit = 0;
 
-  std::vector<unsigned int> piecePlacements [piecenumber];
+  std::vector<unsigned int> piecePlacements [problem.getNumberOfParts()];
   std::vector<unsigned int> voxelPlacements [result->getXYZ()];
 
   /* now we insert one shape after another */
@@ -336,7 +366,7 @@ int assembler_2_c::prepare(void) {
                 literalPositions.push_back(assembler_2_c::piecePosition(x+rotation->getHx(), y+rotation->getHy(), z+rotation->getHz(), rot, pc));
                 lit++;
                 piecePlacements[pc].push_back(lit);
-                placements = 1;
+                placements++;
 
                 /* now add the used cubes of the piece */
                 for (unsigned int pz = rotation->boundZ1(); pz <= rotation->boundZ2(); pz++)
@@ -366,40 +396,25 @@ int assembler_2_c::prepare(void) {
 
     for (unsigned int i = 0; i < cachefill; i++)  delete cache[i];
 
-    /* check, if the current piece has at least one placement */
-    if (placements == 0) {
+    /* check, if the current part has at least the minimum required placements */
+    if (placements < problem.getPartMinimum(pc)) {
       delete [] cache;
       return -problem.getShapeIdOfPart(pc);
     }
   }
 
   int ppc = 0;
-  /* ensure each piece is placed and not placed more than once */
+  /* ensure each part is placed an acceptable number of times */
   for (unsigned int pc = 0; pc < problem.getNumberOfParts(); pc++) {
-
-    /* at least one placement*/
-    for (unsigned int i = 0; i < piecePlacements[pc].size(); i++)
-      solver->add(piecePlacements[pc][i]);
-    solver->add(0);
-
-    /* no more than one placement */
-    ppc += atMostOne(piecePlacements[pc], 0, piecePlacements[pc].size());
+    fprintf(stderr, "piece %d, placements %lu, min %d, max %d\n", pc, piecePlacements[pc].size(), problem.getPartMinimum(pc), problem.getPartMaximum(pc));
+    ppc += cardinalityConstraint(piecePlacements[pc], problem.getPartMinimum(pc), problem.getPartMaximum(pc));
   }
   fprintf(stderr, "piece placement clauses: %d\n", ppc);
 
   int vuc = 0;
   /* ensure each voxel in the result is filled if required and not double filled*/
   for (unsigned int vox = 0; vox < result->getXYZ(); vox++) {
-
-    /* at least one placement*/
-    if (result->getState(vox) == voxel_c::VX_FILLED) {
-      for (unsigned int i = 0; i < voxelPlacements[vox].size(); i++)
-        solver->add(voxelPlacements[vox][i]);
-      solver->add(0);
-    }
-
-    // /* no more than one placement */
-    vuc += atMostOne(voxelPlacements[vox], 0, voxelPlacements[vox].size());
+    vuc += cardinalityConstraint(voxelPlacements[vox], result->getState(vox) == voxel_c::VX_FILLED, 1);
   }
   fprintf(stderr, "voxel usage clauses: %d\n", vuc);
 
@@ -408,6 +423,61 @@ int assembler_2_c::prepare(void) {
   return 1;
 }
 
+int assembler_2_c::cardinalityConstraint(std::vector<unsigned int> lits, unsigned int min, unsigned int max) {
+  bt_assert(min <= max);
+
+  if (lits.size() == 0) return 0;
+  if (max == 0) {
+    for (unsigned int i = 0; i < lits.size(); i++) {
+      solver->add(-lits[i]), solver->add(0);
+    }
+    return lits.size();
+  }
+
+  int counters = ++lit;
+  #define COUNTER(row, column) (counters + (row)*max + (column))
+  lit = COUNTER(lits.size()-1, max-1);
+
+  // first lit iff first bit of first counter
+  solver->add(-lits[0]), solver->add(COUNTER(0,0)), solver->add(0);
+  solver->add(lits[0]), solver->add(-COUNTER(0,0)), solver->add(0);
+
+  // rest of first counter is zero
+  for (unsigned int i = 1; i < max; i++) {
+    solver->add(-COUNTER(0, i)), solver->add(0);
+  }
+  int clauses = 1 + max;
+  
+  // next n-1 counters count correctly
+  for (unsigned int i = 1; i < lits.size(); i++) {
+    // first bit iff lit or first bit of last counter
+    solver->add(-lits[i]), solver->add(COUNTER(i, 0)), solver->add(0);
+    solver->add(-COUNTER(i-1, 0)), solver->add(COUNTER(i, 0)), solver->add(0);
+    solver->add(-COUNTER(i, 0)), solver->add(lits[i]), solver->add(COUNTER(i-1, 0)), solver->add(0);
+    clauses += 3;
+
+    // next bits iff lit and last bit of last counter or same bit of last counter
+    for (unsigned int j = 1; j < max; j++) {
+      solver->add(-lits[i]), solver->add(-COUNTER(i-1, j-1)), solver->add(COUNTER(i, j)), solver->add(0);
+      solver->add(-COUNTER(i-1, j)), solver->add(COUNTER(i, j)), solver->add(0);
+      solver->add(-COUNTER(i, j)), solver->add(COUNTER(i-1, j)), solver->add(lits[i]), solver->add(0);
+      solver->add(-COUNTER(i, j)), solver->add(COUNTER(i-1, j)), solver->add(COUNTER(i-1, j-1)), solver->add(0);
+      clauses += 4;
+    }
+
+    // no overflow
+    solver->add(-lits[i]), solver->add(-COUNTER(i-1, max-1)), solver->add(0); 
+    clauses++;
+  }
+
+  // if min > 0, require min bit of last counter to be 1
+  if (min > 0) {
+    solver->add(COUNTER(lits.size()-1, min-1)), solver->add(0);
+    clauses++;
+  }
+
+  return clauses;
+}
 
 assembler_2_c::errState assembler_2_c::createMatrix(bool keepMirror, bool keepRotations, bool comp) {
 
@@ -422,34 +492,42 @@ assembler_2_c::errState assembler_2_c::createMatrix(bool keepMirror, bool keepRo
   piecenumber = problem.getNumberOfPieces();
 
   /* count the filled and variable units */
-  int res_vari = getResultShape(problem)->countState(voxel_c::VX_VARIABLE);
-  int res_filled = getResultShape(problem)->countState(voxel_c::VX_FILLED) + res_vari;
+  unsigned int res_vari = getResultShape(problem)->countState(voxel_c::VX_VARIABLE);
+  unsigned int res_filled = getResultShape(problem)->countState(voxel_c::VX_FILLED) + res_vari;
 
   // check if number of voxels in pieces is not bigger than
   // number of voxel in result
 
   // check if number of filled voxels in result
   // is not bigger than number of voxels in pieces
-  int h = res_filled;
+  unsigned int min = 0;
+  unsigned int max = 0;
 
-  for (unsigned int j = 0; j < problem.getNumberOfParts(); j++)
-    h -= problem.getPartShape(j)->countState(voxel_c::VX_FILLED);
+  for (unsigned int j = 0; j < problem.getNumberOfParts(); j++) {
+    min += problem.getPartShape(j)->countState(voxel_c::VX_FILLED) * problem.getPartMinimum(j);
+    max += problem.getPartShape(j)->countState(voxel_c::VX_FILLED) * problem.getPartMaximum(j);
+  }
 
-  if (h < 0) {
+  if (min == max)
+    holes = res_filled - min;
+  else if (problem.maxHolesDefined())
+    holes = problem.getMaxHoles();
+  else
+    holes = 0xFFFFFF;
+
+  if (min > res_filled) {
     errorsState = ERR_TOO_MANY_UNITS;
-    errorsParam = -h;
+    errorsParam = min-res_filled;
     return errorsState;
   }
 
-  if (h > res_vari) {
+  if (max < res_filled-res_vari) {
     errorsState = ERR_TOO_FEW_UNITS;
-    errorsParam = h-res_vari;
+    errorsParam = res_filled-res_vari-max;
     return errorsState;
   }
 
-  holes = h;
-
-  /* fill the nodes arrays */
+  /* build the sat reduction */
   int error = prepare();
 
   // check, if there is one piece not placeable
@@ -472,8 +550,7 @@ assembler_2_c::errState assembler_2_c::createMatrix(bool keepMirror, bool keepRo
 }
 
 void assembler_2_c::reduce(void) {
-
-  // TODO: cadical reduce
+  solver->optimize(2);
 }
 
 assembly_c * assembler_2_c::getAssembly(void) {
@@ -487,52 +564,40 @@ assembly_c * assembler_2_c::getAssembly(void) {
     return assembly;
   }
 
-    /* first we need to find the order the piece are in */
-  int * pieces = new int[piecenumber];
-  unsigned char * trans = new unsigned char[piecenumber];
-  int * xs = new int[piecenumber];
-  int * ys = new int[piecenumber];
-  int * zs = new int[piecenumber];
+  std::vector<int> usedLits;
+  std::vector<assembler_2_c::piecePosition> placements [problem.getNumberOfParts()];
 
-  /* fill the array with 0xff, so that we can distinguish between
-   * placed and unplaced pieces
-   */
-  memset(pieces, -1, sizeof(int) * piecenumber);
-
-  int usedPoses [piecenumber];
-
-  for (unsigned int lit = 1; lit < literalPositions.size(); lit++) {
-    if (solver->val(lit) > 0) {
-      assembler_2_c::piecePosition pos = literalPositions[lit];
+  for (unsigned int placement = 1; placement < literalPositions.size(); placement++) {
+    if (solver->val(placement) > 0) {
+      assembler_2_c::piecePosition pos = literalPositions[placement];
       int piece = pos.piece;
-
-      usedPoses[piece] = lit;
-
-      pieces[piece] = lit;
-      trans[piece] = pos.transformation;
-      xs[piece] = pos.x;
-      ys[piece] = pos.y;
-      zs[piece] = pos.z;
+      placements[piece].push_back(pos);
+      usedLits.push_back(placement);
     }
   }
 
-  for (unsigned int pc = 0; pc < piecenumber; pc++)
-    solver->add(-usedPoses[pc]);
+  for (unsigned int pc = 0; pc < usedLits.size(); pc++)
+    solver->add(-usedLits[pc]);
   solver->add(0);
 
-  for (unsigned int i = 0; i < piecenumber; i++)
-    if (pieces[i] < 0) assembly->addNonPlacement();
-    else assembly->addPlacement(trans[i], xs[i], ys[i], zs[i]);
+  for (unsigned int i = 0; i < problem.getNumberOfParts(); i++) {
+    unsigned int j = 0;
+    while (j < placements[i].size()) {
+      assembly->addPlacement(
+        placements[i][j].transformation,
+        placements[i][j].x,
+        placements[i][j].y,
+        placements[i][j].z);
+      j++;
+    }
 
-  delete [] pieces;
-  delete [] trans;
-  delete [] xs;
-  delete [] ys;
-  delete [] zs;
+    while (j < problem.getPartMaximum(i)) {
+      assembly->addNonPlacement();
+      j++;
+  }
+  }
 
-  // sort is not necessary because there is only one of each piece
-  // assembly->sort(puzzle, problem);
-
+  assembly->sort(problem);
   return assembly;
 }
 
@@ -585,8 +650,7 @@ void assembler_2_c::assemble(assembler_cb * callback) {
 }
 
 float assembler_2_c::getFinished(void) const {
-  return 0;
-  //TODO: cadical finished
+  return solverState && solverState == CaDiCaL::UNSATISFIED;
 }
 
 void assembler_2_c::stop(void) {
@@ -621,15 +685,7 @@ void assembler_2_c::debug_step(unsigned long num) {
   // TODO: cadical limit and run
 }
 
-bool assembler_2_c::canHandle(const problem_c & p) {
-
-  // we can not handle if there is one shape having not a counter of 1
-  for (unsigned int s = 0; s < p.getNumberOfParts(); s++)
-    if ((p.getPartMaximum(s) > 1) ||
-        (p.getPartMaximum(s) != p.getPartMinimum(s)))
-
-      return false;
-
+bool assembler_2_c::canHandle(const problem_c &) {
   return true;
 }
 
