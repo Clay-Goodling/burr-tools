@@ -84,25 +84,21 @@ private:
 
   void iterativeSAT(void);
 
-  /* this function checks, if the given piece can be placed
+  /* this function checks if the given piece can be placed
    * at the given position inside the result
    */
   bool canPlace(const voxel_c * piece, int x, int y, int z) const;
 
-  /* this function adds clauses to the solver to ensure that at most
-   * one of the literals in lit[i0:i1) is true
+  /* this function adds clauses to the solver to ensure that at least
+   * [min] and at most [max] of the literals in lits is true
    *
    * returns the number of clauses used
    */
-  int atMostOne(std::vector<unsigned int> lits, int i0, int i1);
+  int cardinalityConstraint(std::vector<unsigned int> lits, unsigned int min, unsigned int max);
 
-  int cardinalityConstraint(std::vector<unsigned int>, unsigned int min, unsigned int max);
-
-  /* this function creates the matrix for the search function
-   * because we need to know how many nodes we need to allocate the
-   * arrays with the right size, we add a parameter. If this is true
-   * the function will not access the array but only count the number
-   * of nodes used. This number is returned
+  /* this function adds constraints to the solver guaranteeing each piece
+   * is used an appropriate number of times and each voxel of the solution
+   * is filled an appropriate number of times.
    *
    * return error codes
    */
@@ -121,7 +117,7 @@ private:
    */
   int holes;
 
-  /* now this isn't hard to guess, is it? */
+  /* the total number of pieces in the puzzle */
   unsigned int piecenumber;
 
   /* the message object that gets called with the solutions as param */
@@ -133,7 +129,7 @@ private:
   unsigned int reducePiece;
   
   /* this vector contains the placement (transformation and position) for
-   * a piece in a row
+   * a piece associated with a literal
    */
   class piecePosition {
 
@@ -146,6 +142,8 @@ private:
     piecePosition(int x_, int y_, int z_, unsigned char transformation_, unsigned int pc): 
     x(x_), y(y_), z(z_), transformation(transformation_), piece(pc) {}
   };
+
+  /* a mapping from literals to piece placements */
   std::vector<piecePosition> literalPositions;
 
   /* the number of used literals*/

@@ -98,35 +98,60 @@ bool assembler_2_c::canPlace(const voxel_c * piece, int x, int y, int z) const {
   return true;
 }
 
-int assembler_2_c::atMostOne(std::vector<unsigned int> lits, int i0, int i1) {
+int assembler_2_c::cardinalityConstraint(std::vector<unsigned int> lits, unsigned int min, unsigned int max) {
+  bt_assert(min <= max);
 
-  bt_assert(i0 <= i1);
-
-  int k = i1 - i0;
-  if (k <= 4) {
-    for (int i = i0; i < i1; i++)
-      for (int j = i+1; j < i1; j++) {
-        solver->add(-lits[i]);
-        solver->add(-lits[j]);
-        solver->add(0);
-      }
-    return (k * (k - 1)) >> 1;
+  if (lits.size() == 0) return 0;
+  if (max == 0) {
+    for (unsigned int i = 0; i < lits.size(); i++) {
+      solver->add(-lits[i]), solver->add(0);
+    }
+    return lits.size();
   }
 
-  int m = ++lit;
-  for (int i = i0; i < i0 + (k >> 1); i++) {
-    solver->add(-lits[i]);
-    solver->add(-m);
-    solver->add(0);
+  int counters = ++lit;
+  #define COUNTER(row, column) (counters + (row)*max + (column))
+  lit = COUNTER(lits.size()-1, max-1);
+
+  // first lit iff first bit of first counter
+  solver->add(-lits[0]), solver->add(COUNTER(0,0)), solver->add(0);
+  solver->add(lits[0]), solver->add(-COUNTER(0,0)), solver->add(0);
+
+  // rest of first counter is zero
+  for (unsigned int i = 1; i < max; i++) {
+    solver->add(-COUNTER(0, i)), solver->add(0);
+  }
+  int clauses = 1 + max;
+  
+  // next n-1 counters count correctly
+  for (unsigned int i = 1; i < lits.size(); i++) {
+    // first bit iff lit or first bit of last counter
+    solver->add(-lits[i]), solver->add(COUNTER(i, 0)), solver->add(0);
+    solver->add(-COUNTER(i-1, 0)), solver->add(COUNTER(i, 0)), solver->add(0);
+    solver->add(-COUNTER(i, 0)), solver->add(lits[i]), solver->add(COUNTER(i-1, 0)), solver->add(0);
+    clauses += 3;
+
+    // next bits iff lit and last bit of last counter or same bit of last counter
+    for (unsigned int j = 1; j < max; j++) {
+      solver->add(-lits[i]), solver->add(-COUNTER(i-1, j-1)), solver->add(COUNTER(i, j)), solver->add(0);
+      solver->add(-COUNTER(i-1, j)), solver->add(COUNTER(i, j)), solver->add(0);
+      solver->add(-COUNTER(i, j)), solver->add(COUNTER(i-1, j)), solver->add(lits[i]), solver->add(0);
+      solver->add(-COUNTER(i, j)), solver->add(COUNTER(i-1, j)), solver->add(COUNTER(i-1, j-1)), solver->add(0);
+      clauses += 4;
+    }
+
+    // no overflow
+    solver->add(-lits[i]), solver->add(-COUNTER(i-1, max-1)), solver->add(0); 
+    clauses++;
   }
 
-  for (int i = i0 + (k >> 1); i < i1; i++) {
-    solver->add(-lits[i]);
-    solver->add(m);
-    solver->add(0);
+  // if min > 0, require min bit of last counter to be 1
+  if (min > 0) {
+    solver->add(COUNTER(lits.size()-1, min-1)), solver->add(0);
+    clauses++;
   }
 
-  return k + atMostOne(lits, i0, i0 + (k >> 1)) + atMostOne(lits, i0 + (k >> 1), i1);
+  return clauses;
 }
 
 /**
@@ -423,62 +448,6 @@ int assembler_2_c::prepare(void) {
   return 1;
 }
 
-int assembler_2_c::cardinalityConstraint(std::vector<unsigned int> lits, unsigned int min, unsigned int max) {
-  bt_assert(min <= max);
-
-  if (lits.size() == 0) return 0;
-  if (max == 0) {
-    for (unsigned int i = 0; i < lits.size(); i++) {
-      solver->add(-lits[i]), solver->add(0);
-    }
-    return lits.size();
-  }
-
-  int counters = ++lit;
-  #define COUNTER(row, column) (counters + (row)*max + (column))
-  lit = COUNTER(lits.size()-1, max-1);
-
-  // first lit iff first bit of first counter
-  solver->add(-lits[0]), solver->add(COUNTER(0,0)), solver->add(0);
-  solver->add(lits[0]), solver->add(-COUNTER(0,0)), solver->add(0);
-
-  // rest of first counter is zero
-  for (unsigned int i = 1; i < max; i++) {
-    solver->add(-COUNTER(0, i)), solver->add(0);
-  }
-  int clauses = 1 + max;
-  
-  // next n-1 counters count correctly
-  for (unsigned int i = 1; i < lits.size(); i++) {
-    // first bit iff lit or first bit of last counter
-    solver->add(-lits[i]), solver->add(COUNTER(i, 0)), solver->add(0);
-    solver->add(-COUNTER(i-1, 0)), solver->add(COUNTER(i, 0)), solver->add(0);
-    solver->add(-COUNTER(i, 0)), solver->add(lits[i]), solver->add(COUNTER(i-1, 0)), solver->add(0);
-    clauses += 3;
-
-    // next bits iff lit and last bit of last counter or same bit of last counter
-    for (unsigned int j = 1; j < max; j++) {
-      solver->add(-lits[i]), solver->add(-COUNTER(i-1, j-1)), solver->add(COUNTER(i, j)), solver->add(0);
-      solver->add(-COUNTER(i-1, j)), solver->add(COUNTER(i, j)), solver->add(0);
-      solver->add(-COUNTER(i, j)), solver->add(COUNTER(i-1, j)), solver->add(lits[i]), solver->add(0);
-      solver->add(-COUNTER(i, j)), solver->add(COUNTER(i-1, j)), solver->add(COUNTER(i-1, j-1)), solver->add(0);
-      clauses += 4;
-    }
-
-    // no overflow
-    solver->add(-lits[i]), solver->add(-COUNTER(i-1, max-1)), solver->add(0); 
-    clauses++;
-  }
-
-  // if min > 0, require min bit of last counter to be 1
-  if (min > 0) {
-    solver->add(COUNTER(lits.size()-1, min-1)), solver->add(0);
-    clauses++;
-  }
-
-  return clauses;
-}
-
 assembler_2_c::errState assembler_2_c::createMatrix(bool keepMirror, bool keepRotations, bool comp) {
 
   bt_assert(problem.resultValid());
@@ -530,7 +499,7 @@ assembler_2_c::errState assembler_2_c::createMatrix(bool keepMirror, bool keepRo
   /* build the sat reduction */
   int error = prepare();
 
-  // check, if there is one piece not placeable
+  // check, if there are any pieces not placeable
   if (error <= 0) {
     errorsState = ERR_CAN_NOT_PLACE;
     errorsParam = -error;
@@ -570,8 +539,7 @@ assembly_c * assembler_2_c::getAssembly(void) {
   for (unsigned int placement = 1; placement < literalPositions.size(); placement++) {
     if (solver->val(placement) > 0) {
       assembler_2_c::piecePosition pos = literalPositions[placement];
-      int piece = pos.piece;
-      placements[piece].push_back(pos);
+      placements[pos.piece].push_back(pos);
       usedLits.push_back(placement);
     }
   }
