@@ -26,7 +26,6 @@
 #include <vector>
 #include <set>
 #include <stack>
-#include <memory>
 
 #include "cadical/src/cadical.hpp"
 
